@@ -1,6 +1,6 @@
 """Codex app-server quota 适配器。
 
-本模块通过 `codex -s read-only -a untrusted app-server` 的行分隔 JSON-RPC 2.0
+本模块通过 `codex -s read-only -a never app-server` 的行分隔 JSON-RPC 2.0
 接口读取账号 rate limit 信息，并转换为 Agent Deck 可展示的稳定模型。它不读取或
 修改 Codex 配置，不发送 prompt，不执行工具，不连接 Agent Deck daemon，也不访问
 StreamDock 硬件。外部副作用仅限用户显式调用读取函数时启动一个短生命周期 Codex
@@ -31,7 +31,7 @@ DEFAULT_CODEX_APP_SERVER_COMMAND: Final[tuple[str, ...]] = (
     "-s",
     "read-only",
     "-a",
-    "untrusted",
+    "never",
     "app-server",
 )
 

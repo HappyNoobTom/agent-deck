@@ -821,7 +821,7 @@ def codex_quota(
     返回：无显式返回值；成功时将 `CodexQuotaSnapshot` 以 JSON 输出。
     错误处理：Codex CLI 不存在、app-server 超时、JSON-RPC 错误或解析失败时写 stderr
     并以 exit 1 退出。
-    副作用：启动短生命周期 `codex -s read-only -a untrusted app-server` 子进程；
+    副作用：启动短生命周期 `codex -s read-only -a never app-server` 子进程；
     不访问 StreamDock 硬件、不修改 Codex 配置、不连接 daemon。
     """
 

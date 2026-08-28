@@ -13,10 +13,30 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from agent_deck.adapters.codex_quota import (
+    DEFAULT_CODEX_APP_SERVER_COMMAND,
     CodexQuotaSnapshot,
     display_plan_name,
     parse_rate_limits_response,
 )
+
+
+def test_default_codex_app_server_command_uses_supported_approval_policy() -> None:
+    """默认 quota 子进程不得继续使用 Codex 已移除的审批策略。
+
+    入参：无；读取生产代码中的默认 app-server 命令。
+    返回：无返回值；断言通过表示命令保持只读，并使用 Codex 当前支持的 `never` 策略。
+    错误处理：参数回退到旧 `untrusted` 值时由 pytest 断言报告。
+    副作用：无；不启动 Codex 子进程。
+    """
+
+    assert DEFAULT_CODEX_APP_SERVER_COMMAND == (
+        "codex",
+        "-s",
+        "read-only",
+        "-a",
+        "never",
+        "app-server",
+    )
 
 
 def test_parse_rate_limits_response_maps_prolite_to_prolite() -> None:

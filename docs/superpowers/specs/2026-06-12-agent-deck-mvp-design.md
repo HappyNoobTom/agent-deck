@@ -259,7 +259,7 @@ Codex Desktop App 的 Plan Mode `request_user_input` 不是 `PermissionRequest` 
 
 ### Codex quota 轮询与底部虚拟视窗
 
-Codex quota 来自短生命周期 `codex -s read-only -a untrusted app-server` 的
+Codex quota 来自短生命周期 `codex -s read-only -a never app-server` 的
 `account/rateLimits/read`。第一版不把 quota 作为 agent 状态事件，而是作为 daemon runtime
 中的独立快照：
 
