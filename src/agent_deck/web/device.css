@@ -654,3 +654,22 @@
   color: #eef5fb;
   background: rgba(29, 58, 70, 0.82);
 }
+
+
+/* 与宿主硬件任务卡片保持相同的身份/状态信息，长标题最多显示两行。 */
+.agent-task-card {
+  width: 100%; height: 100%; padding: 10%;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 5%;
+  color: #6fd5ff; text-align: left;
+}
+.agent-task-number { font-size: clamp(9px, 1vw, 12px); letter-spacing: .03em; }
+.agent-task-title {
+  color: var(--text, #eef3fb); font-size: clamp(11px, 1.2vw, 16px); line-height: 1.3;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.agent-task-status { font-size: clamp(10px, 1vw, 13px); }
+.agent-task-card.empty { color: #7e8d9d; }
+.agent-task-card.needs-user { color: #ffc857; }
+.agent-task-card.error { color: #ff7070; }
+.agent-task-card.completed { color: #83e7b4; }

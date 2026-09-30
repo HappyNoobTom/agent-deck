@@ -12,6 +12,7 @@ ChatGPT Settings-gated read-only SSH Remote observation 与真实 StreamDock ren
 from __future__ import annotations
 
 import asyncio
+import os
 import math
 import base64
 import binascii
@@ -29,6 +30,9 @@ from typing import Any, Protocol
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
+
+from agent_deck.actions.remote import remote_focus_action_executor, remote_url_action_executor
+from agent_deck.rendering.agent_key import render_agent_key_image
 
 from agent_deck.actions.app_icon_cache import (
     AppIconCache,
@@ -75,6 +79,10 @@ from agent_deck.adapters.codex_app_state import (
     read_codex_app_active_sessions,
 )
 from agent_deck.adapters.codex_quota import CodexQuotaSnapshot, read_codex_quota
+from agent_deck.adapters.remote_codex import (
+    remote_codex_quota_reader,
+    remote_codex_token_usage_reader,
+)
 from agent_deck.adapters.codex_remote_ssh import (
     CodexRemoteSshObserver,
     CodexRemoteSshDiscoverySnapshot,
@@ -109,6 +117,7 @@ from agent_deck.config import (
 )
 from agent_deck.hardware.fake import FakeHardwareSurface, HardwareInput
 from agent_deck.hardware.capabilities import get_device_profile
+from agent_deck.hardware.remote_streamdock import RemoteStreamDockN4ProRenderer
 from agent_deck.hardware.streamdock_n4pro import (
     StreamDockN4ProAnimationResult,
     StreamDockN4ProPersistentAnimator,
@@ -181,6 +190,7 @@ from agent_deck.rendering.quota_touchscreen import render_quota_touchscreen
 from agent_deck.rendering.status_key import (
     QuotaStatusWindow,
     render_quota_status_key_image,
+    render_status_unavailable_key_image,
     render_usage_summary_key_image,
 )
 from agent_deck.rendering.shortcut_key import ShortcutKeyImageCache
@@ -2445,6 +2455,7 @@ class _DaemonRuntime:
             token_usage_snapshot=self.codex_token_usage_snapshot,
             status_key_cache=self.status_key_image_cache,
             appearance=self.display_appearance,
+            agent_cards=bool(os.environ.get("AGENT_DECK_STREAMDOCK_BRIDGE_URL")),
         )
         key_images = dict(base_images)
         pet_key_indexes = {
@@ -3394,6 +3405,13 @@ def _build_default_n4pro_renderer_sink(
     副作用：仅创建 renderer 对象并保存回调引用，不 open/init 真实硬件。
     """
 
+    bridge_url = os.environ.get("AGENT_DECK_STREAMDOCK_BRIDGE_URL", "").strip()
+    if bridge_url:
+        return RemoteStreamDockN4ProRenderer(
+            bridge_url,
+            timeout_seconds=float(os.environ.get("AGENT_DECK_STREAMDOCK_BRIDGE_TIMEOUT", "8")),
+        )
+
     animator = StreamDockN4ProPersistentAnimator(
         input_callback=lambda _device, event: runtime.apply_streamdock_input_event(event)
     )
@@ -3490,6 +3508,25 @@ def create_app(
     """
 
     resolved_poller_config = poller_config or DaemonPollerConfig()
+    # In Docker, the macOS Codex CLI and its credentials remain on the host.
+    # Use the host bridge as the single collection boundary when configured.
+    host_codex_bridge_url = os.environ.get("AGENT_DECK_CODEX_BRIDGE_URL", "").strip()
+    if host_codex_bridge_url:
+        # 宿主动作必须在 Mac 执行；显式注入的测试/自定义执行器仍优先使用。
+        if focus_action_executor is focus_agent_target:
+            focus_action_executor = remote_focus_action_executor(host_codex_bridge_url)
+        if local_url_action_executor is open_local_url:
+            local_url_action_executor = remote_url_action_executor(host_codex_bridge_url)
+        if codex_quota_reader is read_codex_quota:
+            codex_quota_reader = remote_codex_quota_reader(
+                host_codex_bridge_url,
+                timeout_seconds=resolved_poller_config.codex_quota_timeout_seconds,
+            )
+        if codex_token_usage_reader is read_codex_token_usage:
+            codex_token_usage_reader = remote_codex_token_usage_reader(
+                host_codex_bridge_url,
+                timeout_seconds=resolved_poller_config.codex_quota_timeout_seconds,
+            )
     resolved_codex_remote_ssh_observers: dict[
         str, CodexRemoteSshObserverProtocol
     ] = {}
@@ -4851,6 +4888,7 @@ def _key_images_from_layout(
     token_usage_snapshot: CodexTokenUsageSnapshot | None = None,
     status_key_cache: StatusKeyImageCache | None = None,
     appearance: DeckAppearanceSettings | None = None,
+    agent_cards: bool = False,
 ) -> dict[int, Any]:
     """从 layout 提取 N4 Pro 静态主键图片。
 
@@ -4860,6 +4898,7 @@ def _key_images_from_layout(
     面板已经复用的状态数据；`status_key_cache` 缓存状态按键渲染结果；
     ``appearance`` 是跨内容的当前显示外观。
     返回：物理按钮编号到 Pillow 图像的映射；包含 App、URL、快捷键和状态型主键。
+    `agent_cards=True` 时为容器桥接提供含任务标题的静态卡片，否则保留本地动画。
     错误处理：单个图标读取失败会 fallback 成 token 图，不影响整轮渲染。
     副作用：可能只读 `.app` bundle 图标资源或访问 favicon 缓存；状态图缓存 miss 时会创建
     内存图片；不访问硬件、不启动 App、不执行 ccusage。
@@ -4869,6 +4908,11 @@ def _key_images_from_layout(
     resolved_status_key_cache = status_key_cache or StatusKeyImageCache()
     resolved_shortcut_key_cache = shortcut_key_cache or ShortcutKeyImageCache()
     for key in layout.keys[:10]:
+        if agent_cards and key.kind == "agent":
+            key_images[key.index + 1] = render_agent_key_image(
+                key.index, key.label, key.status.value if key.status else None,
+                appearance=appearance,
+            )
         if key.kind == "app":
             app_name = key.payload.get("app_name") or key.label
             app_path = key.payload.get("app_path")
@@ -4923,17 +4967,31 @@ def _key_images_from_layout(
                     appearance=appearance,
                 )
             )
-        if key.kind == "quota_status" and quota_snapshot is not None:
-            key_images[key.index + 1] = resolved_status_key_cache.quota_image(
-                quota_snapshot,
-                window=key.payload.get("quota_window"),
-                appearance=appearance,
+        if key.kind == "quota_status":
+            key_images[key.index + 1] = (
+                resolved_status_key_cache.quota_image(
+                    quota_snapshot,
+                    window=key.payload.get("quota_window"),
+                    appearance=appearance,
+                )
+                if quota_snapshot is not None
+                else render_status_unavailable_key_image("Quota", reason="未连接", appearance=appearance)
             )
-        if key.kind == "usage_summary" and token_usage_snapshot is not None:
-            key_images[key.index + 1] = resolved_status_key_cache.usage_image(
-                token_usage_snapshot,
-                period=key.payload.get("usage_period"),
-                appearance=appearance,
+        if key.kind == "usage_summary":
+            key_images[key.index + 1] = (
+                resolved_status_key_cache.usage_image(
+                    token_usage_snapshot,
+                    period=key.payload.get("usage_period"),
+                    appearance=appearance,
+                )
+                if token_usage_snapshot is not None
+                else render_status_unavailable_key_image("Usage", reason="未连接", appearance=appearance)
+            )
+        if key.kind == "disabled":
+            # Keep an explicit image in the complete static map so a previous
+            # animated Codex frame cannot survive a layout change.
+            key_images[key.index + 1] = render_status_unavailable_key_image(
+                "", reason="", appearance=appearance
             )
     return key_images
 

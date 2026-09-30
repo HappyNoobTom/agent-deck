@@ -101,17 +101,18 @@ def interaction_intent_from_streamdock_input_event(
 def _streamdock_key_value_to_layout_index(key_value: int) -> int | None:
     """把 StreamDock SDK button key 编号转换成 Agent Deck layout index。
 
-    入参：`key_value` 是 SDK event.key.value。N4 Pro 真实主按键上报 11-20，对应物理
-    10 个主键；部分测试替身或其他型号可能使用 1-10。
+    入参：`key_value` 是 SDK event.key.value。官方 SDK 已把 N4 Pro 硬件码解码为逻辑键：主键为 1-10，副屏触控键为 11-14。
     返回：0-based layout key index；未知编号返回 None。
     错误处理：无。
     副作用：无。
     """
 
-    if 11 <= key_value <= 20:
-        return key_value - 11
+    # StreamDockN4Pro.decode_input_event already converts hardware codes to
+    # SDK logical keys: 1..10 are the ten main keys, 11..14 are touch-bar keys.
     if 1 <= key_value <= 10:
         return key_value - 1
+    if 11 <= key_value <= 14:
+        return key_value - 11
     return None
 
 

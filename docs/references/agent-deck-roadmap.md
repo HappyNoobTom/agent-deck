@@ -191,8 +191,13 @@ flowchart LR
     latest-wins 和短合并窗口下发，避免输入高频时排队旧显示。
     `/status` 的 `streamdock_input.recent_events` 和 `interaction.recent` 保留最近输入与
     业务 intent/action 的小型 ring buffer，用于真实硬件现场调试按键序列。
-    实测 N4 Pro 的 10 个主物理按键在 SDK button event 中上报为 `key=11..20`，
-    映射到 Agent Deck layout index `0..9`；不要按通用 1-based `1..10` 解释。
+    当前 vendored N4 Pro SDK 会先解码硬件码：主键事件为 logical `key=1..10`，
+    副屏触控键为 logical `key=11..14`，分别映射 layout index `0..9` 和镜像槽位 `0..3`。
+    不要把历史 SDK 的 `11..20` 假设套用到当前 decoder。
+    Docker renderer 显式清除空键，并用同一绑定的实际图片填充四个副屏；Agent 卡片包含
+    任务名称和状态，Web 使用 daemon 的实际任务映射保持排序一致。
+    Mac 桥接接收结构化 focus/URL 动作；当前 Codex 任务 focus 仅激活 App，保留
+    `app_activated_only` 诊断，尚未实现具体聊天切换。
     渲染层显示剩余百分比，不改 quota adapter 的 `used_percent` 原始语义。未来没有触屏能力的
     设备应通过 device profile 禁用该 panel 或切换到其他显示方式。若 daemon 禁用真实硬件
     renderer，则可回退到 quota-only 真实硬件 sink 或纯 fake surface。

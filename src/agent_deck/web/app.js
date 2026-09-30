@@ -348,8 +348,21 @@ function runtimeAgents() {
   return state.status?.agents || [];
 }
 
+/** 使用 daemon 的实际键面映射找任务，避免存储顺序和硬件优先级排序不一致。 */
 function agentForSlot(slot) {
-  return runtimeAgents()[slot - 1] || null;
+  const key = state.keys.filter((key) => key.kind === "agent")[slot - 1];
+  const projected = state.status?.layout?.keys?.find((item) => item.index === key?.index);
+  if (projected?.kind === "agent") {
+    return runtimeAgents().find((agent) => agent.agent_key === projected.agent_key) || null;
+  }
+  return null;
+}
+
+/** 把任务状态转换为可读标签，空槽位明确说明等待任务。 */
+function agentStateLabel(agent) {
+  const labels = {idle: "空闲", running: "运行中", thinking: "思考中", tool_running: "执行中",
+    waiting_user: "待输入", approval_needed: "待审批", error: "出错", completed_recently: "已完成"};
+  return agent ? labels[agent.status] || agent.status : "未分配";
 }
 
 function agentVisualClass(agent) {
@@ -598,7 +611,11 @@ function renderKeyFace(key) {
   }
   if (key.kind === "agent") {
     const agent = agentForSlot(key.slot);
-    return `<div class="agent-visual ${agentVisualClass(agent)}"></div>`;
+    return `<div class="agent-task-card ${agentVisualClass(agent)}">
+      <span class="agent-task-number">${String(key.index + 1).padStart(2, "0")} · TASK</span>
+      <strong class="agent-task-title">${escapeHtml(agent?.display_name || "等待任务")}</strong>
+      <span class="agent-task-status">● ${escapeHtml(agentStateLabel(agent))}</span>
+    </div>`;
   }
   if (key.kind === "codex_pet") {
     return `
@@ -881,7 +898,7 @@ function renderKeyInspector() {
   el.selectedTitle.textContent = keyLabel(key);
   el.selectedSubtitle.textContent =
     key.kind === "agent"
-      ? "按键只表达状态，不显示文字或详情。"
+      ? "显示任务名称和状态；按下选择任务并激活 Codex 应用。"
       : key.kind === "codex_pet"
         ? "跟随 Codex 当前选择的宠物；仅展示，点击无动作。"
       : key.kind === "quota_status"
@@ -1899,6 +1916,11 @@ async function refreshStatus() {
     const response = await fetch("/status", { cache: "no-store" });
     if (!response.ok) throw new Error(`status ${response.status}`);
     state.status = await response.json();
+    // 外部配置更新后同步已应用布局；保留正在编辑或拖拽的草稿。
+    if (!state.keys.some((key) => key.dirty) && !keySwapController.isDragging()) {
+      const layoutResponse = await fetch("/ui/key-layout", { cache: "no-store" });
+      if (layoutResponse.ok) applyKeyLayoutResponse(await layoutResponse.json());
+    }
     reconcileHardwareApply();
     renderPassiveRuntimeRefresh();
   } catch (error) {

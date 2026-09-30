@@ -2461,11 +2461,11 @@ def test_default_n4pro_renderer_input_callback_routes_button_intents(
         assert callable(input_callback)
         response = input_callback(
             object(),
-            _sdk_event(event_type="button", key=16, state=1),
+            _sdk_event(event_type="button", key=6, state=1),
         )
         release_response = input_callback(
             object(),
-            _sdk_event(event_type="button", key=16, state=0),
+            _sdk_event(event_type="button", key=6, state=0),
         )
         status = client.get("/status").json()
 
@@ -2475,10 +2475,10 @@ def test_default_n4pro_renderer_input_callback_routes_button_intents(
     assert release_response["handled"] is False
     assert status["interaction"]["last_intent"]["source"] == "streamdock_button"
     assert status["interaction"]["last_action"]["intent"] == "focus_agent"
-    assert status["streamdock_input"]["recent_events"][-2]["key"] == 16
+    assert status["streamdock_input"]["recent_events"][-2]["key"] == 6
     assert status["streamdock_input"]["recent_events"][-2]["state"] == 1
     assert status["streamdock_input"]["recent_events"][-2]["handled"] is True
-    assert status["streamdock_input"]["recent_events"][-1]["key"] == 16
+    assert status["streamdock_input"]["recent_events"][-1]["key"] == 6
     assert status["streamdock_input"]["recent_events"][-1]["state"] == 0
     assert status["streamdock_input"]["recent_events"][-1]["handled"] is False
     assert status["interaction"]["recent"][-1]["intent"]["intent"] == "select_agent"

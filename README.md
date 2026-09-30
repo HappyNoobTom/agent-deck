@@ -106,6 +106,40 @@ scripts/agent-deckd-tmux.sh stop
 
 若要接管 N4 Pro，请先退出官方 MiraBox/StreamDock 应用，并在启动前通过 `doctor` 检查设备线索。macOS 上 SDK 动态库不兼容时，需要将 `AGENT_DECK_STREAMDOCK_SDK_PATH` 指向官方 Python SDK；具体做法见[真实硬件运行](docs/guides/using-agent-deck.zh-CN.md#真实硬件运行)。
 
+## Docker 运行
+
+Docker Desktop 在 macOS 上运行于 Linux VM，不能把 Mac 的 IOKit/HID 设备直接继承给容器。因此本项目采用两层结构：Agent Deck daemon、只读会话状态读取和 Web 配置页在 Docker 中运行；`scripts/streamdock-bridge.py` 作为外置盘上的极小宿主机桥接进程，使用官方 macOS SDK 访问 N4 Pro。桥接进程负责硬件显示、输入回传、宿主 Codex CLI 额度采集以及结构化 focus/URL 动作；Mac 凭据不复制到容器。
+
+首次启动：
+
+```bash
+cd /Volumes/datassd/MiraBox/agent-deck
+scripts/docker-agent-deck.sh hardware-up
+```
+
+打开 [http://127.0.0.1:8766/](http://127.0.0.1:8766/)。常用管理命令：
+
+```bash
+scripts/docker-agent-deck.sh status
+scripts/docker-agent-deck.sh hardware
+scripts/docker-agent-deck.sh logs
+scripts/docker-agent-deck.sh hardware-down
+```
+
+`up` 命令只启动 Docker 内的 fake hardware 模式，适合没有连接设备时查看配置页；`hardware-up` 才会同时启动 macOS SDK 桥接并让容器使用真实 N4 Pro。桥接由外置盘项目中的 tmux 会话托管，`restart` 会根据桥接是否存在保持当前硬件模式，`hardware-down` 会同时停止两层服务。
+
+容器模式使用任务名称、键号和状态卡片区分 Agent；没有任务的 Agent 槽位显示“等待任务”，
+关闭的键会显式清屏，避免设备继续保留旧 Codex 图标。N4 Pro 四个副屏触控键镜像主布局的
+第 1–4 键：显示和输入使用同一份绑定，不使用固定的 Quota/Today/Week 标签。
+Web 预览按 daemon 的实际槽位映射显示任务；无未保存草稿时自动同步外部更新的布局。
+
+`focus_agent` 和 `open_url` 通过 Mac 桥接执行，桥接返回失败时 daemon 保留失败诊断。
+当前任务键选择 Agent 并激活 Codex 应用；只激活 App 的结果明确标为 `app_activated_only`，
+尚不支持切换 Codex 内部具体聊天。App 启动键、键盘快捷键和系统音量/亮度动作暂未接入
+Docker 宿主桥接；不要把 Linux 的动作能力当成完整 Mac 能力。
+
+项目源代码、容器状态、Agent Deck 缓存和日志都在 `/Volumes/datassd/MiraBox/agent-deck`。Docker Desktop 的镜像层仍由 Docker Desktop 自己管理；若要求连镜像层也放到外置盘，需要在 Docker Desktop 的 Disk image location 中单独迁移。
+
 ## Codex 集成与安全边界
 
 Agent Deck 可读取 Codex 的本地状态、quota 和 `ccusage` 数据，并可选安装 Codex hook 集成。安装器始终先输出 dry-run，只有显式传入 `--apply` 才会写入本机 Codex 配置：

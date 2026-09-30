@@ -40,6 +40,7 @@ QuotaStatusWindow = str
 UsageSparklineMetric = Literal["total_tokens", "cost_usd"]
 """usage_summary sparkline 可使用的趋势指标。"""
 
+
 _SCALE: Final[int] = 4
 _BACKGROUND: Final[tuple[int, int, int]] = (10, 14, 22)
 _SURFACE: Final[tuple[int, int, int]] = (15, 21, 32)
@@ -66,6 +67,56 @@ _USAGE_PERIOD_COLORS: Final[Mapping[CodexTokenPeriod, tuple[int, int, int]]] = {
     CodexTokenPeriod.ALL: (255, 143, 112),
 }
 """usage_summary 各统计周期的身份色，用于顶部标签和底部趋势线。"""
+
+def render_status_unavailable_key_image(
+    label: str,
+    *,
+    reason: str = "未连接",
+    size: tuple[int, int] = N4PRO_STATUS_KEY_SIZE,
+    appearance: DeckAppearanceSettings | None = None,
+) -> Image.Image:
+    """渲染状态采集失败占位；label/reason 同时为空时返回纯色清屏图。
+
+    入参为标签、原因、合法键面尺寸和外观；返回 Pillow 图，不执行动作或写入硬件。
+    非法尺寸抛 ValueError；空键不包含 ERROR 徽标。
+    """
+
+    _validate_key_size(size)
+    palette = _status_palette(appearance)
+    if not label and not reason:
+        return Image.new("RGB", size, palette.background)
+    canvas = _new_canvas(size, palette=palette)
+    draw = ImageDraw.Draw(canvas)
+    _draw_key_surface(draw, size, palette=palette)
+    _draw_badge(
+        draw,
+        (size[0] / 2, 10),
+        "ERROR",
+        _QUATERNARY,
+        text_fill=palette.foreground,
+        surface=palette.surface,
+    )
+    _draw_fitted_text(
+        draw,
+        label,
+        bounds=(8, 34, 104, 61),
+        max_size=18,
+        min_size=12,
+        fill=palette.foreground,
+        bold=True,
+        anchor="mm",
+    )
+    _draw_fitted_text(
+        draw,
+        reason,
+        bounds=(8, 66, 104, 91),
+        max_size=13,
+        min_size=9,
+        fill=palette.muted_foreground,
+        bold=False,
+        anchor="mm",
+    )
+    return _downsample(canvas, size)
 
 
 def render_quota_status_key_image(

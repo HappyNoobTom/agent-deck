@@ -1,0 +1,32 @@
+services:
+  agent-deck:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: agent-deck:0.2.0-arm64
+    container_name: agent-deck
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8766:8765"
+    environment:
+      AGENT_DECK_HARDWARE_MODE: "${AGENT_DECK_HARDWARE_MODE:-fake}"
+      AGENT_DECK_HOST: "0.0.0.0"
+      AGENT_DECK_PORT: "8765"
+      HOME: "/data/home"
+      CODEX_HOME: "/data/home/.codex"
+      AGENT_DECK_APP_ICON_CACHE_DIR: "/data/state/icon-cache/apps"
+      AGENT_DECK_SHORTCUT_ICON_ROOT: "/data/state/shortcut-icons"
+      AGENT_DECK_URL_ICON_CACHE_DIR: "/data/state/icon-cache/urls"
+      AGENT_DECK_N4PRO_KEY_LAYOUT: "/data/state/n4pro-key-layout.json"
+      AGENT_DECK_N4PRO_ROTARY_LAYOUT: "/data/state/n4pro-rotary-layout.json"
+      AGENT_DECK_N4PRO_PETS_PANEL_SETTINGS: "/data/state/n4pro-pets-panel.json"
+      AGENT_DECK_DISPLAY_APPEARANCE: "/data/state/deck-appearance.json"
+      AGENT_DECK_QUOTA_PRESENTATION: "/data/state/quota-presentation.json"
+      AGENT_DECK_STREAMDOCK_SDK_PATH: "/app/vendor/streamdock-python-sdk/src"
+      AGENT_DECK_STREAMDOCK_BRIDGE_URL: "${AGENT_DECK_STREAMDOCK_BRIDGE_URL:-}"
+      AGENT_DECK_CODEX_BRIDGE_URL: "${AGENT_DECK_CODEX_BRIDGE_URL:-http://host.docker.internal:8767}"
+    volumes:
+      - ./container-data:/data
+      - ${HOME}/.codex:/data/home/.codex:ro
+      - ${HOME}/Library/Application Support/Codex:/data/home/Library/Application Support/Codex:ro
+      - ${HOME}/Library/Application Support/com.openai.codex:/data/home/Library/Application Support/com.openai.codex:ro
