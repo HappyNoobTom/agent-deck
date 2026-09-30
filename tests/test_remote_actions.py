@@ -68,3 +68,17 @@ def test_daemon_selects_remote_focus_when_bridge_configured(monkeypatch):
     monkeypatch.setenv('AGENT_DECK_CODEX_BRIDGE_URL', 'http://mac:8767')
     runtime = create_app().state.runtime
     assert runtime.focus_action_executor.__module__ == 'agent_deck.actions.remote'
+
+
+def test_quota_key_opens_details_even_without_multiple_windows():
+    """只有一个额度窗口时，按键也应切到额度详情，不能成功返回却没有可见变化。"""
+    from datetime import datetime, UTC
+    from agent_deck.server.app import create_app
+    client = TestClient(create_app())
+    keys = [{'index': i, 'kind': 'disabled'} for i in range(10)]
+    keys[2] = {'index': 2, 'kind': 'quota_status', 'quota_window': 'auto'}
+    assert client.put('/ui/key-layout', json={'keys': keys}).status_code == 200
+    response = client.post('/hardware/input', json={'kind': 'key', 'index': 2, 'value': {'state': 1},
+                                                  'occurred_at': datetime.now(UTC).isoformat()})
+    assert response.status_code == 200
+    assert client.get('/status').json()['logical_panel']['selection']['active_kind'] == 'quota'

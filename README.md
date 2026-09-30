@@ -132,6 +132,7 @@ scripts/docker-agent-deck.sh hardware-down
 关闭的键会显式清屏，避免设备继续保留旧 Codex 图标。N4 Pro 四个副屏触控键镜像主布局的
 第 1–4 键：显示和输入使用同一份绑定，不使用固定的 Quota/Today/Week 标签。
 Web 预览按 daemon 的实际槽位映射显示任务；无未保存草稿时自动同步外部更新的布局。
+额度键按下会打开触屏额度详情，即使账户仅提供单个额度窗口也有可见反馈。
 
 `focus_agent` 和 `open_url` 通过 Mac 桥接执行，桥接返回失败时 daemon 保留失败诊断。
 当前任务键选择 Agent 并激活 Codex 应用；只激活 App 的结果明确标为 `app_activated_only`，

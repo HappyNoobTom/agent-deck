@@ -2306,7 +2306,7 @@ class _DaemonRuntime:
         入参：`intent` 是按下状态型主键产生的 interaction intent。
         返回：JSON-safe action 诊断，包含切换后的窗口。
         错误处理：若 key layout 中找不到匹配 quota key，返回 missing_key，不抛异常。
-        副作用：更新 runtime 内存 key layout 并 render 当前 layout；不写用户配置文件、不刷新 quota。
+        副作用：更新 runtime 内存 key layout，并在触屏打开额度详情；不写用户配置文件、不刷新 quota。
         """
 
         updated_window = _next_quota_status_window(
@@ -2326,6 +2326,11 @@ class _DaemonRuntime:
                 "ok": False,
                 "message": "quota_status key not found in current key layout",
             }
+        # 单额度窗口也有可见反馈：按键打开详情，多窗口继续循环窗口。
+        self.logical_panel_selection = self.logical_panel_selection.model_copy(
+            update={"active_kind": PanelKind.QUOTA, "quota_window": updated_window}
+        )
+        self.render_current_logical_panel_image()
         layout = self.render_current()
         self.prewarm_status_key_images(layout)
         self.publish_hardware_key_surface_images(layout)
